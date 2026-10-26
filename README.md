@@ -67,6 +67,11 @@ cd Clear-Home
 ./install.sh 192.168.1.50     # your TV's IP; remembered in .tv afterwards
 ```
 
+**Or skip building:** download the APK from
+[Releases](https://github.com/twilighty-abhi/Clear-Home/releases/latest) and run
+`adb connect <TV-IP>:5555` then `adb install ClearHome-*.apk`. (To switch to your own build
+later, uninstall that one first: the signing keys differ.)
+
 The first time, the TV asks **"Allow USB debugging?"**. Tick *Always allow from this
 computer* and accept. `install.sh` installs the app and opens it.
 
