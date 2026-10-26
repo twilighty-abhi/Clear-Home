@@ -17,7 +17,7 @@ Clear Home was started by [Ajzal](https://github.com/Mohammedajzal).
 > **The authors and anyone sharing this repository are not responsible or liable** for any
 > damage, data loss, bricked or misbehaving devices, voided warranties, security issues or
 > any other problem that comes from using it. Read the scripts before you run them, and
-> only install it on a TV you own or are allowed to change.
+> only install it on a TV you own or are allowed to change. See also the [MIT license](LICENSE).
 
 ## What it does
 
@@ -191,5 +191,6 @@ Started by [Ajzal](https://github.com/Mohammedajzal). Sample background photos a
 [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT). Weather by
 [Open-Meteo](https://open-meteo.com).
 
-No license has been chosen for this code yet, so default copyright applies. Ask before
-reusing it in your own projects.
+## License
+
+[MIT](LICENSE). You're free to use, change and share it; it comes with no warranty.
