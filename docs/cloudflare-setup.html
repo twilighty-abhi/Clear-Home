@@ -1,0 +1,138 @@
+<title>Flat App Cloudflare Setup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Layout: one readable column like a setup runbook; steps as a checklist, settings as copyable tables. */
+  :root {
+    --bg: #f7f6f2; --surface: #ffffff; --fg: #1f2022; --dim: #64666b; --line: #e3e1da;
+    --accent: #e8590c; --accent-soft: #fdebdc; --code-bg: #f1efe9; --warn-bg: #fff4d6; --warn-fg: #6b4a00;
+    --display: "Outfit", system-ui, sans-serif; --body: "Source Serif 4", Georgia, serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #141517; --surface: #1c1d20; --fg: #ecebe7; --dim: #a3a49f; --line: #2e3034;
+    --accent: #ff8a3d; --accent-soft: #3a2414; --code-bg: #232428; --warn-bg: #3a3014; --warn-fg: #f4d78c; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #141517; --surface: #1c1d20; --fg: #ecebe7; --dim: #a3a49f; --line: #2e3034;
+    --accent: #ff8a3d; --accent-soft: #3a2414; --code-bg: #232428; --warn-bg: #3a3014; --warn-fg: #f4d78c; color-scheme: dark }
+
+  body { background: var(--bg); color: var(--fg); font: 17px/1.6 var(--body); }
+  .wrap { max-width: 720px; margin: 0 auto; padding-block: 48px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 36px; line-height: 1.1; }
+  h2 { font-size: 23px; display: flex; align-items: baseline; gap: 12px; }
+  h2 .n { font-size: 14px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 2px 9px; border-radius: 99px; font-variant-numeric: tabular-nums; }
+  p { margin: 0; }
+  .lede { color: var(--dim); font-size: 18px; }
+  .meta { font-family: var(--display); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+  section { display: grid; gap: 12px; }
+  ol, ul { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+  code, .k { font-family: var(--mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+  .table { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); background: var(--code-bg); }
+  td:first-child { color: var(--dim); white-space: nowrap; }
+  td .k { white-space: nowrap; }
+  .note { background: var(--warn-bg); color: var(--warn-fg); border-radius: 12px; padding: 14px 16px; font-size: 16px; }
+  .note strong { font-family: var(--display); }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .summary div { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .summary b { display: block; font-family: var(--display); font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .summary span { font-family: var(--mono); font-size: 14.5px; overflow-wrap: anywhere; }
+  .check li::marker { content: "☐  "; color: var(--accent); }
+  footer { color: var(--dim); font-size: 15px; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="meta">Setup request · about 15 minutes</div>
+    <h1>Cloudflare setup for our flat app</h1>
+    <p class="lede">We run a small web app for our flat (notes, chores, shopping list) on a Raspberry Pi at home. We'd like to reach it from outside at <code>flat.example.com</code>, behind a Cloudflare sign-in so only the flatmates get in. The Pi side is already done; this page covers the Cloudflare side.</p>
+  </header>
+
+  <div class="summary" aria-label="At a glance">
+    <div><b>Public address</b><span>flat.example.com</span></div>
+    <div><b>Points to</b><span>http://localhost:8642</span></div>
+    <div><b>Runs on</b><span>Raspberry Pi 3 · arm64</span></div>
+    <div><b>Who gets in</b><span>Flatmates' emails, one-time code</span></div>
+  </div>
+
+  <section>
+    <h2><span class="n">1</span>Add the domain (skip if it's already in the account)</h2>
+    <ol>
+      <li>In the Cloudflare dashboard, choose <strong>Add a domain</strong>, enter <code>example.com</code>, and pick the <strong>Free</strong> plan.</li>
+      <li>Cloudflare shows two nameservers. Send them to whoever manages the domain, to set at the registrar.</li>
+      <li>Wait until Cloudflare shows the domain as <strong>Active</strong>. There are no other records on this domain that need copying.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Create the tunnel</h2>
+    <ol>
+      <li>Go to <strong>Zero Trust → Networks → Tunnels → Create a tunnel</strong>, type <strong>Cloudflared</strong>, name it <code>clear-home</code>.</li>
+      <li>On the install screen, choose <strong>Debian</strong> and <strong>arm64-bit</strong>. Copy only the long token (the text after <code>--token</code>). The program is already installed on the Pi, so no command needs running.</li>
+      <li>Send the token to whoever runs the Pi, privately (not in a group chat). It works like a password for the tunnel. They save it on the Pi (in <code>~/clearhome/tunnel-token</code>), and the tunnel shows <strong>Healthy</strong> within about a minute.</li>
+      <li>Add a <strong>Public Hostname</strong> with these settings:</li>
+    </ol>
+    <div class="table">
+      <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Subdomain</td><td><span class="k">flat</span></td></tr>
+        <tr><td>Domain</td><td><span class="k">example.com</span></td></tr>
+        <tr><td>Path</td><td>leave empty</td></tr>
+        <tr><td>Service type</td><td><span class="k">HTTP</span></td></tr>
+        <tr><td>URL</td><td><span class="k">localhost:8642</span></td></tr>
+      </table>
+    </div>
+    <p>Cloudflare then creates this DNS record by itself. Nothing to add by hand:</p>
+    <div class="table">
+      <table>
+        <tr><th>Type</th><th>Name</th><th>Target</th><th>Proxy</th></tr>
+        <tr><td>CNAME</td><td><span class="k">flat</span></td><td><span class="k">&lt;tunnel-id&gt;.cfargotunnel.com</span></td><td>Proxied</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Add the sign-in (Cloudflare Access)</h2>
+    <div class="note"><strong>Please do this before sharing the link.</strong> The app trusts Cloudflare's sign-in to say who someone is; without it, people arriving through the tunnel only get a limited guest page, but the sign-in should be in place.</div>
+    <p>Go to <strong>Zero Trust → Access → Applications → Add an application → Self-hosted</strong>:</p>
+    <div class="table">
+      <table>
+        <tr><th>Setting</th><th>Value</th></tr>
+        <tr><td>Application name</td><td><span class="k">Flat app</span></td></tr>
+        <tr><td>Application domain</td><td><span class="k">flat.example.com</span> (no path)</td></tr>
+        <tr><td>Session duration</td><td><span class="k">1 month</span>, so phones stay signed in</td></tr>
+        <tr><td>Login method</td><td>One-time PIN (emailed code)</td></tr>
+        <tr><td>Policy name</td><td><span class="k">Flatmates</span></td></tr>
+        <tr><td>Action</td><td><span class="k">Allow</span></td></tr>
+        <tr><td>Include</td><td>Emails: the flatmates' email addresses</td></tr>
+      </table>
+    </div>
+    <p>Leave everything else at its default. The app reads the signed-in email from the <code>Cf-Access-Authenticated-User-Email</code> header that Access adds, so nothing else needs configuring.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Check it works</h2>
+    <ul class="check">
+      <li>The tunnel <code>clear-home</code> shows <strong>Healthy</strong>.</li>
+      <li>Opening <code>https://flat.example.com</code> in a private window shows the Cloudflare sign-in, not the app.</li>
+      <li>Signing in with one of the allowed emails opens the flat app.</li>
+      <li>Any other email is refused.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Good to know</h2>
+    <ul>
+      <li>No ports are opened on the home router. The Pi connects out to Cloudflare.</li>
+      <li>Everything on the Pi runs under a normal user account. Pi-hole on the same Pi isn't touched.</li>
+      <li>To switch it off, delete the public hostname or the tunnel. The app keeps working at home.</li>
+      <li>Adding a flatmate later: add their email to the <strong>Flatmates</strong> policy.</li>
+    </ul>
+  </section>
+
+  <footer>Questions about the Pi or the app: ask whoever runs the Pi. Thanks for setting this up!</footer>
+</div>

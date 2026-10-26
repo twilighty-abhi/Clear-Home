@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="600" viewBox="0 0 1040 600">
+  <!-- Stand-in for the Mapbox traffic map in the browser preview (no real location). -->
+  <rect width="1040" height="600" fill="#3a4250"/>
+  <g fill="none" stroke="#262c36" stroke-width="2">
+    <path d="M0 120h1040M0 260h1040M0 410h1040M0 530h1040M130 0v600M310 0v600M520 0v600M700 0v600M880 0v600"/>
+  </g>
+  <g fill="none" stroke="#2bb3a3" stroke-width="5" stroke-linecap="round">
+    <path d="M0 340C200 320 360 250 520 300S860 420 1040 380"/>
+    <path d="M460 0C470 160 500 260 560 360S640 520 650 600"/>
+  </g>
+  <path d="M520 240a22 22 0 0 0-22 22c0 16 22 38 22 38s22-22 22-38a22 22 0 0 0-22-22z" fill="#fff"/>
+  <circle cx="520" cy="262" r="7" fill="none" stroke="#8a8f99" stroke-width="2"/>
+</svg>

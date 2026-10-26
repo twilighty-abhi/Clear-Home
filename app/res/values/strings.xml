@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Clear Home</string>
+    <string name="remote_button_name">Clear Home remote button</string>
+    <string name="remote_button_desc">Makes the TCL button on the remote open Clear Home. It only watches for that one button; every other key passes through untouched.</string>
+</resources>

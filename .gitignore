@@ -1,0 +1,26 @@
+# Build output
+build/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local machine state
+.tv
+.home-backup
+
+# Secrets: never commit. Templates live next to them as *.example.json.
+secrets/*.json
+!secrets/*.example.json
+app/assets/secrets/*.json
+!app/assets/secrets/*.example.json
+
+# App signing key (each checkout makes its own on first build)
+keystore/
+
+# Artwork extracted from installed apps for the browser preview (third-party logos)
+design/art/
+.a11y-backup
+.assistant-backup
+
+# Copied from app/assets by pi/install.sh
+pi/web/
