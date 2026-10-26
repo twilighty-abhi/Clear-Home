@@ -1548,3 +1548,13 @@ html, body {
 .tm.done .tm-arc { stroke-dashoffset: 0 !important; animation: tm-pulse 1.2s ease-in-out infinite; }
 @keyframes tm-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .tm.done .tm-arc { animation: none; } }
+
+/* Settings → Location: the search box is a settings row holding a text field. */
+.srow.loc-search { padding-top: 0; padding-bottom: 0; background: rgba(255, 255, 255, 0.07); }
+.srow.loc-search input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none;
+  color: inherit; font: inherit; -webkit-appearance: none; appearance: none;
+}
+.srow.loc-search input::placeholder { color: var(--dim); }
+.srow.loc-search:focus-within { background: rgba(255, 255, 255, 0.94); color: #111; transform: scale(1.02); }
+.srow.loc-search:focus-within input::placeholder { color: #777; }

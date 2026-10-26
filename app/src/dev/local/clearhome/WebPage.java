@@ -293,6 +293,26 @@ final class WebPage implements Core.Page {
         @JavascriptInterface public void wantCards(boolean ac, boolean traffic) { core.wantCards(ac, traffic); }
         @JavascriptInterface public String getNowPlaying() { return core.nowPlaying.state().toString(); }
         @JavascriptInterface public String notesUrl() { return House.publicUrl(ctx); }
+        /** Home location from Settings → Location, or "null" when not chosen yet. */
+        @JavascriptInterface public String getPlace() { JSONObject p = core.place.get(); return p == null ? "null" : p.toString(); }
+        @JavascriptInterface public boolean setPlace(String json) { return core.place.set(json); }
+        @JavascriptInterface public void clearPlace() { core.place.clear(); }
+        /** Opens or closes the on-screen keyboard for the focused text field (Settings → Location). */
+        @JavascriptInterface
+        public void keyboard(final boolean show) {
+            ui.post(() -> {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        ctx.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm == null) return;
+                if (show) {
+                    view.requestFocus();
+                    imm.showSoftInput(view, 0);
+                } else {
+                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                }
+            });
+        }
+
         @JavascriptInterface public String photosStatus() { return core.photos.status(); }
         @JavascriptInterface public void photosSync() { core.photos.syncNow(); }
         @JavascriptInterface public void photosDisconnect() { core.photos.disconnect(); }

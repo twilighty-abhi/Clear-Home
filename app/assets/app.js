@@ -48,6 +48,7 @@
 
   const DEFAULTS = {
     layout: 'dashboard', bg: 'graphite', font: 'outfit', icons: true, clock24: false, hourly: false,
+    units: 'auto', photoSeconds: 45, idleSeconds: 12, trafficCard: true, acCard: true,
     order: [], hidden: [], seeded: false, seedVersion: 0
   };
 
@@ -57,7 +58,12 @@
     { key: 'font', label: 'Typography', options: FONTS },
     { key: 'icons', label: 'App artwork', options: [[true, 'On'], [false, 'Off']] },
     { key: 'clock24', label: 'Clock', options: [[false, '12-hour'], [true, '24-hour']] },
-    { key: 'hourly', label: 'Hourly forecast', options: [[false, 'Off'], [true, 'On']] }
+    { key: 'hourly', label: 'Hourly forecast', options: [[false, 'Off'], [true, 'On']] },
+    { key: 'units', label: 'Temperature', options: [['auto', 'Auto'], ['c', '°C'], ['f', '°F']] },
+    { key: 'photoSeconds', label: 'Next photo every', options: [[20, '20 seconds'], [45, '45 seconds'], [90, '90 seconds'], [300, '5 minutes']] },
+    { key: 'idleSeconds', label: 'Photo frame after', options: [[12, '12 seconds'], [30, '30 seconds'], [60, '1 minute'], [0, 'Never']] },
+    { key: 'trafficCard', label: 'Traffic card', options: [[true, 'On'], [false, 'Off']] },
+    { key: 'acCard', label: 'Air conditioner card', options: [[true, 'On'], [false, 'Off']] }
   ];
 
   const ICON_GRID = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>';
@@ -78,6 +84,7 @@
   let photoStatus = null;   // last status from the Google Photos bridge
   let photoPoll = 0;
   let disconnectArmed = false;
+  let loc = { query: '', searched: '', results: [], busy: '', error: '' }; // Location screen
 
   // ---------- persistence ----------
 
@@ -233,6 +240,7 @@
     else if (screen === 'all') ov.innerHTML = allHtml();
     else if (screen === 'photos') ov.innerHTML = photosHtml();
     else if (screen === 'notes') ov.innerHTML = notesHtml();
+    else if (screen === 'location') ov.innerHTML = locationHtml();
     else ov.innerHTML = '';
   }
 
@@ -251,6 +259,7 @@
       `<span>${d.label}</span><span class="val">${esc(optionLabel(d))}</span></div>`).join('');
     return '<div class="scrim"></div><div class="panel"><h2>Settings</h2><div class="rows" data-scroll="y">' +
       rows +
+      `<div class="srow" tabindex="-1" data-f data-key="act:location" data-action="location"><span>Location</span><span class="val">${esc(placeLabel(readPlace()) || 'Not set')} ›</span></div>` +
       `<div class="srow" tabindex="-1" data-f data-key="act:photos" data-action="photos"><span>Photos</span><span class="val">${esc(photosLabel())} ›</span></div>` +
       '<div class="srow" tabindex="-1" data-f data-key="act:notes" data-action="notes"><span>Flat app</span><span class="val">Notes, chores, who\'s home ›</span></div>' +
       '<div class="divider"></div>' +
@@ -391,6 +400,115 @@
       : '<p class="ph-p err">The TV has no network address right now, so phones can\'t reach it.</p>';
     return '<div class="scrim"></div><div class="panel photos-panel"><h2>Flat app</h2>' +
       '<div class="rows" data-scroll="y">' + body + '</div></div>';
+  }
+
+  // ---------- Location screen ----------
+  // Search uses Open-Meteo's free geocoder (no key); "Detect" asks ipwho.is where this
+  // network's address is, then looks that town up in the geocoder for its district.
+
+  function readPlace() {
+    try { return typeof native.getPlace === 'function' ? JSON.parse(native.getPlace()) : null; } catch (e) { return null; }
+  }
+
+  function placeLabel(p, full) {
+    if (!p) return '';
+    const parts = [p.name];
+    if (full && p.admin2 && p.admin2 !== p.name) parts.push(p.admin2);
+    if (p.admin1 && p.admin1 !== p.name) parts.push(p.admin1);
+    if (full && p.countryName) parts.push(p.countryName);
+    else if (p.country) parts.push(p.country);
+    return parts.join(', ');
+  }
+
+  function locationHtml() {
+    const cur = readPlace();
+    const results = loc.results.map((p, i) =>
+      `<div class="srow" tabindex="-1" data-f data-key="loc:r${i}" data-action="loc-pick" data-i="${i}">` +
+      `<span>${esc(p.name)}</span><span class="val">${esc(placeLabel(p, true).slice(p.name.length + 2))}</span></div>`).join('');
+    const status = loc.busy ? `<p class="ph-p">${esc(loc.busy)}</p>`
+      : loc.error ? `<p class="ph-p err">${esc(loc.error)}</p>`
+      : loc.searched && !loc.results.length ? `<p class="ph-p">No places called “${esc(loc.searched)}”. Try a nearby town or city.</p>` : '';
+    return '<div class="scrim"></div><div class="panel photos-panel"><h2>Location</h2><div class="rows" data-scroll="y">' +
+      `<p class="ph-p">${cur ? `Home is set to <b>${esc(placeLabel(cur))}</b>.` : 'Home isn\'t set yet.'} ` +
+      'It\'s used for weather, air quality, the traffic map and, in India, official weather alerts.</p>' +
+      '<div class="srow loc-search" tabindex="-1" data-f data-key="loc:q">' +
+      `<input id="locQuery" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="60" ` +
+      `placeholder="Search for your city or town" value="${esc(loc.query)}"></div>` +
+      status + results +
+      (loc.results.length ? '<div class="divider"></div>' : '') +
+      prow('loc-detect', 'Detect from internet connection', '') +
+      (cur ? prow('loc-clear', 'Clear location', '') : '') +
+      '<div class="info">OK on the search box opens the keyboard · OK again to search<br>' +
+      'Searches go to open-meteo.com; Detect asks ipwho.is</div>' +
+      '</div></div>';
+  }
+
+  function refreshLocation(focusKey) {
+    if (screen !== 'location') return;
+    renderOverlay();
+    restoreFocus(focusKey || (document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null));
+  }
+
+  // The TV's on-screen keyboard doesn't always open for a field focused from script.
+  function keyboard(show) {
+    try { if (typeof native.keyboard === 'function') native.keyboard(show); } catch (e) { /* older bridge */ }
+  }
+
+  const geoLang = () => ((navigator.language || 'en').slice(0, 2));
+
+  async function geocode(name, country) {
+    const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=' + geoLang() +
+      '&name=' + encodeURIComponent(name) + (country ? '&countryCode=' + country : ''));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return ((await r.json()).results || []).map((g) => ({
+      name: g.name, lat: g.latitude, lon: g.longitude, country: g.country_code || '', countryName: g.country || '',
+      admin1: g.admin1 || '', admin2: g.admin2 || ''
+    }));
+  }
+
+  async function searchPlaces(q) {
+    q = q.trim();
+    loc.query = q;
+    if (q.length < 2) return;
+    keyboard(false);
+    loc = Object.assign(loc, { searched: q, results: [], busy: 'Searching…', error: '' });
+    refreshLocation('loc:q');
+    try { loc.results = await geocode(q); } catch (e) { loc.error = 'Couldn\'t search: check the TV\'s internet connection.'; }
+    loc.busy = '';
+    refreshLocation(loc.results.length ? 'loc:r0' : 'loc:q');
+  }
+
+  async function detectPlace() {
+    loc = Object.assign(loc, { results: [], searched: '', busy: 'Finding this network\'s location…', error: '' });
+    refreshLocation('ph:loc-detect');
+    try {
+      const ip = await (await fetch('https://ipwho.is/')).json();
+      if (!ip.success) throw new Error(ip.message || 'lookup failed');
+      let p = { name: ip.city, lat: ip.latitude, lon: ip.longitude, country: ip.country_code || '', admin1: ip.region || '', admin2: '' };
+      // The geocoder knows the district; take its nearest match for the same town.
+      try {
+        const near = (await geocode(ip.city, ip.country_code))
+          .map((g) => Object.assign(g, { d: Math.hypot(g.lat - p.lat, (g.lon - p.lon) * Math.cos(p.lat * Math.PI / 180)) }))
+          .sort((a, b) => a.d - b.d)[0];
+        if (near && near.d < 0.5) p = near; // within ~50 km
+      } catch (e) { /* keep the IP lookup's answer */ }
+      loc.busy = '';
+      pickPlace(p, 'Detected: ');
+    } catch (e) {
+      loc.busy = '';
+      loc.error = 'Couldn\'t detect the location. Search for your town instead.';
+      refreshLocation('loc:q');
+    }
+  }
+
+  function pickPlace(p, prefix) {
+    let ok = false;
+    try { ok = typeof native.setPlace === 'function' && native.setPlace(JSON.stringify(p)); } catch (e) { ok = false; }
+    if (!ok) { toast('Couldn\'t save that location'); return; }
+    loc = { query: '', searched: '', results: [], busy: '', error: '' };
+    toast((prefix || 'Home set to ') + placeLabel(p));
+    if (window.Dashboard.placeChanged) window.Dashboard.placeChanged();
+    open('settings');
   }
 
   function allHtml() {
@@ -542,6 +660,7 @@
     lastFocus[screen] = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : lastFocus[screen];
     screen = name;
     if (name === 'photos') { readPhotoStatus(); disconnectArmed = false; startPhotoPoll(); }
+    if (name === 'location') { loc = { query: '', searched: '', results: [], busy: '', error: '' }; lastFocus.location = null; } // start on the search box
     renderOverlay();
     restoreFocus(lastFocus[name]);
   }
@@ -549,7 +668,7 @@
   function back() {
     if (moving) { moving = null; renderOverlay(); restoreFocus(lastFocus.edit); return; }
     resetArmed = false;
-    if (screen === 'edit' || screen === 'photos' || screen === 'notes') { open('settings'); return; }
+    if (screen === 'edit' || screen === 'photos' || screen === 'notes' || screen === 'location') { open('settings'); return; }
     if (screen === 'settings' || screen === 'all') {
       screen = 'home';
       renderOverlay();
@@ -574,6 +693,7 @@
     state[key] = next[0];
     save();
     render();
+    if (window.Dashboard.settingsChanged) window.Dashboard.settingsChanged();
   }
 
   function toggleHidden(pkg) {
@@ -611,6 +731,15 @@
       case 'edit': open('edit'); break;
       case 'photos': open('photos'); break;
       case 'notes': open('notes'); break;
+      case 'location': open('location'); break;
+      case 'loc-pick': pickPlace(loc.results[+d.i]); break;
+      case 'loc-detect': detectPlace(); break;
+      case 'loc-clear':
+        if (typeof native.clearPlace === 'function') native.clearPlace();
+        toast('Location cleared');
+        if (window.Dashboard.placeChanged) window.Dashboard.placeChanged();
+        refreshLocation('loc:q');
+        break;
       case 'ph-unhide': toast(window.Dashboard.unhideAll() + ' photos back in the slideshow'); refreshPhotosScreen(); break;
       case 'ph-sync': native.photosSync(); toast('Checking the Drive folder…'); break;
       case 'ph-disconnect':
@@ -633,6 +762,7 @@
         state = JSON.parse(JSON.stringify(DEFAULTS));
         save();
         refreshApps();
+        if (window.Dashboard.settingsChanged) window.Dashboard.settingsChanged();
         break;
       default:
         if (d.pkg) launch(d.pkg);
@@ -645,6 +775,19 @@
 
   document.addEventListener('keydown', (e) => {
     const k = e.key;
+    // Typing in the location search box: letters, Backspace and ◀ ▶ edit the text.
+    if (e.target && e.target.id === 'locQuery') {
+      const box = e.target;
+      if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); box.blur(); focus(box.parentNode); nav(k); }
+      else if (k === 'Escape') { e.preventDefault(); back(); }
+      else if (k === 'Enter') {
+        loc.query = box.value;
+        // OK with a new query searches; otherwise it falls through and opens the keyboard.
+        if (box.value.trim().length >= 2 && box.value.trim() !== loc.searched) { e.preventDefault(); searchPlaces(box.value); }
+        else keyboard(true);
+      }
+      return;
+    }
     // Photo-frame view: ◀ ▶ photos, OK pause, ▼ hide. Any other key wakes the home screen.
     if (state.layout === 'dashboard' && screen === 'home' && window.Dashboard.isIdle() && window.Dashboard.idleKey(k)) {
       e.preventDefault();
@@ -666,7 +809,9 @@
       nav(k);
     } else if (k === 'Enter' || k === ' ') {
       e.preventDefault();
-      if (!e.repeat) activate(document.activeElement);
+      const el = document.activeElement;
+      if (el && el.dataset && el.dataset.key === 'loc:q') { $('locQuery').focus(); keyboard(true); return; } // into the text box
+      if (!e.repeat) activate(el);
     } else if (k === 'Escape' || k === 'Backspace' || k === 'BrowserBack' || k === 'GoBack') {
       e.preventDefault();
       back();
@@ -678,6 +823,7 @@
 
   // Mouse support for the browser preview.
   document.addEventListener('click', (e) => {
+    if (e.target.id === 'locQuery') return; // let the text box take the click
     const el = e.target.closest('[data-f]');
     if (el) { focus(el); activate(el); }
   });
@@ -723,6 +869,11 @@
     onMenu: () => { if (screen === 'settings') back(); else open('settings'); },
     onResume: () => { tick(); window.Dashboard.wake(); refreshApps(); window.Dashboard.refresh(); },
     clock24: () => state.clock24,
+    pref: (k) => state[k],
+    placeChanged: () => {
+      if (window.Dashboard.placeChanged) window.Dashboard.placeChanged();
+      if (screen === 'settings') { renderOverlay(); restoreFocus(lastFocus.settings); }
+    },
     hourly: () => state.hourly,
     acChanged: () => window.Dashboard.refresh(),
     mediaChanged: () => window.Dashboard.media(),

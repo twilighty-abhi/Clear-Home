@@ -8,14 +8,20 @@
   const has = (fn) => native && typeof native[fn] === 'function';
 
   const CONFIG = {
-    place: { name: 'Kochi', lat: 9.9312, lon: 76.2673 }, // your home: weather and air quality
-    commute: { from: 'Home', to: 'Work' },
-    photoSeconds: 45,
-    showTrafficMap: false, // traffic map card is set up but switched off for now
-    showAc: false,         // AC card (Tapo plugs) is set up but switched off for now
-    idleSeconds: 12,
     dream: /[?&]dream\b/.test(location.search) // running as the TV screensaver
   };
+  // Settings chosen on the TV (app.js): photo interval, idle delay, units, which cards show.
+  const pref = (k, fallback) => {
+    const v = window.ClearHome && window.ClearHome.pref ? window.ClearHome.pref(k) : undefined;
+    return v === undefined ? fallback : v;
+  };
+
+  // Home location from Settings → Location: {name, lat, lon, country, admin1, admin2}, or null.
+  let place = null;
+  function readPlace() {
+    try { place = has('getPlace') ? JSON.parse(native.getPlace()) : null; } catch (e) { place = null; }
+    return place;
+  }
 
   // ---------- icons ----------
 
@@ -167,6 +173,11 @@
   function paintWeather() {
     const el = document.querySelector('#home .d-weather');
     if (!el) return;
+    if (!place) {
+      el.innerHTML = '<div class="w-main"><div class="w-text"><div class="w-cond">Weather</div>' +
+        '<div class="w-det">Choose your location in Settings → Location</div></div></div>';
+      return;
+    }
     if (!weather) { el.innerHTML = ''; return; }
     const w = weather;
     const details = [`Feels ${Math.round(w.feels)}°`, `H ${Math.round(w.hi)}°  L ${Math.round(w.lo)}°`];
@@ -175,7 +186,7 @@
     el.innerHTML =
       '<div class="w-main">' + icon(weatherIcon(w.code, w.day), 'w-ico') +
       `<div class="w-temp">${Math.round(w.temp)}°</div>` +
-      `<div class="w-text"><div class="w-cond">${CONDITIONS[w.code] || ''} · ${CONFIG.place.name}</div>` +
+      `<div class="w-text"><div class="w-cond">${CONDITIONS[w.code] || ''} · ${esc(place.name)}</div>` +
       `<div class="w-det">${details.join('<span class="sep"></span>')}</div>` +
       (rainText() ? `<div class="w-rain">${icon('drop', 'w-drop')}<span>${rainText()}</span></div>` : '') +
       '</div></div>' +
@@ -199,8 +210,8 @@
         `<div class="ac-sub al-msg" lang="${esc(a.lang || 'en')}">${esc(a.message)}</div></div>` +
         `<div class="c-sub dim ac-total">${until ? 'Until ' + until + ' · ' : ''}${esc(a.source || 'NDMA')}${a.sample ? ' · sample' : ''}</div></div>`;
     });
-    if (commute && commute.mode === 'map' && !CONFIG.showTrafficMap) {
-      // Map card switched off (CONFIG.showTrafficMap).
+    if (commute && !pref('trafficCard', true)) {
+      // Traffic card switched off in Settings.
     } else if (commute && commute.mode === 'map') {
       const c = commute;
       const mins = Math.max(0, Math.round((Date.now() - c.updated) / 60000));
@@ -221,13 +232,13 @@
       const c = commute;
       const delay = c.minutes - c.typical;
       const vsUsual = delay > 2 ? ` · ${delay} min slower than usual` : delay < -2 ? ` · ${-delay} min faster than usual` : ' · as usual';
-      out += `<div class="card"><div class="c-head">${icon('car', 'c-ico')}<span>To ${esc(c.to || CONFIG.commute.to)}</span>` +
+      out += `<div class="card"><div class="c-head">${icon('car', 'c-ico')}<span>To ${esc(c.to || 'Work')}</span>` +
         (c.sample ? '<em>sample</em>' : '') + '</div>' +
         `<div class="c-val">${c.minutes}<small> min</small></div>` +
         `<div class="c-sub"><span class="dot ${c.level}"></span>${cap(c.level)} traffic${vsUsual}</div>` +
         (c.distanceKm ? `<div class="c-sub dim">${c.distanceKm} km by road</div>` : '') + '</div>';
     }
-    if (acs.length && CONFIG.showAc) {
+    if (acs.length && pref('acCard', true)) {
       // One card for all ACs, a row per room, so more plugs can be added without crowding the screen.
       const sample = acs.some((a) => a.sample);
       const totalToday = acs.reduce((t, a) => t + (a.ok ? a.kwhToday : 0), 0);
@@ -612,15 +623,20 @@
   function startPhotos() {
     clearInterval(photoTimer);
     if (paused) return;
-    photoTimer = setInterval(() => showPhoto(true), CONFIG.photoSeconds * 1000);
+    photoTimer = setInterval(() => showPhoto(true), pref('photoSeconds', 45) * 1000);
   }
 
   // ---------- data ----------
 
   async function loadWeather() {
-    const { lat, lon } = CONFIG.place;
+    if (!readPlace()) { weather = null; aqi = null; rainSlots = null; paintWeather(); return; }
+    const { lat, lon } = place;
+    // Auto: °F where that's the norm (US and a few others), °C everywhere else.
+    const units = pref('units', 'auto');
+    const f = units === 'f' || (units === 'auto' && /^(US|BS|BZ|KY|PW|LR|FM|MH)$/.test(place.country || ''));
+    const unit = f ? '&temperature_unit=fahrenheit' : '';
     try {
-      const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + unit +
         '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day' +
         '&hourly=temperature_2m,weather_code,precipitation_probability,is_day' +
         '&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=2' +
@@ -684,11 +700,13 @@
     stage.classList.remove('hint');
     closeHidePrompt();
     clearTimeout(idleTimer);
+    const idleSeconds = pref('idleSeconds', 12);
+    if (!idleSeconds) return wasIdle; // "Never": the dashboard stays up
     idleTimer = setTimeout(() => {
       if (document.getElementById('stage').dataset.layout !== 'dashboard') return;
       stage.classList.add('idle', 'hint');
       setTimeout(() => stage.classList.remove('hint'), 6000);
-    }, CONFIG.idleSeconds * 1000);
+    }, idleSeconds * 1000);
     return wasIdle;
   }
 
@@ -731,7 +749,8 @@
   }
 
   function start() {
-    if (has('wantCards')) native.wantCards(!!CONFIG.showAc, !!CONFIG.showTrafficMap); // don't poll hidden cards
+    wantCards();
+    readPlace();
     loadLocal();
     loadWeather();
     startPhotos();
@@ -743,12 +762,27 @@
     wake();
   }
 
+  // Don't poll plugs or traffic for cards that are switched off.
+  function wantCards() {
+    if (has('wantCards')) native.wantCards(!!pref('acCard', true), !!pref('trafficCard', true));
+  }
+
+  // A setting changed on the TV: re-read what depends on it.
+  function settingsChanged() {
+    wantCards();
+    startPhotos();
+    wake();
+    loadWeather();
+    paintCards();
+  }
+
   window.Dashboard = {
+    settingsChanged: settingsChanged, placeChanged: loadWeather,
     html: html, paint: paint, start: start, wake: wake, onFocus: onFocus, refresh: () => { loadLocal(); loadNowPlaying(); }, media: loadNowPlaying,
     isIdle: isIdle, idleKey: idleKey, unhideAll: unhideAll, hiddenCount: () => hidden.size,
     // Shared dashboard data (weather, photos, notes) for other views.
     data: () => ({
-      weather: weather, condition: weather ? CONDITIONS[weather.code] || '' : '', place: CONFIG.place.name,
+      weather: weather, condition: weather ? CONDITIONS[weather.code] || '' : '', place: place ? place.name : '',
       rain: rainText(), photos: photos, notes: notes, alerts: alerts, hidden: hidden, memoryKind: memoryKind
     })
   };

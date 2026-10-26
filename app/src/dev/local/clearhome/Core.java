@@ -18,6 +18,7 @@ final class Core {
     final GoogleDrive photos;
     final Tapo tapo;
     final Commute commute;
+    final Place place;
     final Alerts alerts;
     final House house;
     final NowPlaying nowPlaying;
@@ -36,11 +37,14 @@ final class Core {
     private Core(Context app) {
         photos = new GoogleDrive(app, () -> broadcast("ClearHome.photosChanged()"));
         tapo = new Tapo(app, () -> broadcast("ClearHome.acChanged()"));
-        commute = new Commute(app, () -> broadcast("ClearHome.acChanged()"));
-        // Home location and district names for alerts (here Kochi, Ernakulam district; "EKM" in Kerala alert texts).
-        alerts = new Alerts(9.9312, 76.2673,
-                new String[]{"EKM", "Ernakulam", "എറണാകുളം", "Kochi"},
-                () -> broadcast("ClearHome.acChanged()"));
+        place = new Place(app, () -> {
+            if (instance == null) return;
+            instance.alerts.placeChanged();
+            instance.commute.placeChanged();
+            broadcast("ClearHome.placeChanged && ClearHome.placeChanged()");
+        });
+        commute = new Commute(app, place, () -> broadcast("ClearHome.acChanged()"));
+        alerts = new Alerts(place, () -> broadcast("ClearHome.acChanged()"));
         house = new House(app, () -> { broadcast("ClearHome.acChanged()"); if (instance != null) instance.timers.changed(); });
         house.photos = photos;
         nowPlaying = new NowPlaying(app, () -> broadcast("ClearHome.mediaChanged && ClearHome.mediaChanged()"));

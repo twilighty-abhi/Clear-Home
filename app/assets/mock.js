@@ -106,6 +106,12 @@
     photosStatus: () => JSON.stringify(mockPhotos),
     photosSync: () => {},
     photosDisconnect: () => { mockPhotos = { configured: true, state: 'signin' }; },
+    // Location, kept in the browser for the preview (starts at a sample city).
+    getPlace: () => localStorage.getItem('mock.place') ||
+      JSON.stringify({ name: 'Kochi', lat: 9.9312, lon: 76.2673, country: 'IN', admin1: 'Kerala', admin2: 'Ernakulam' }),
+    setPlace: (json) => { localStorage.setItem('mock.place', json); return true; },
+    clearPlace: () => { localStorage.setItem('mock.place', 'null'); },
+    keyboard: () => {},
     isDefaultHome: () => false,
     version: () => 'preview'
   };

@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
  *
  * Config (API key, from/to coordinates and names) arrives as commute.json in the app's
  * external files dir, pushed by commute-setup.sh; it's moved into private storage and
- * the file is deleted.
+ * the file is deleted. Without "area" or "from"/"to", the map and area modes use the
+ * location chosen in Settings.
  */
 final class Commute {
     interface Listener { void onChanged(); }
@@ -41,13 +42,15 @@ final class Commute {
 
     private final Context ctx;
     private final SharedPreferences prefs;
+    private final Place place;
     private final Listener listener;
     private final ScheduledExecutorService io = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> poller;
     private volatile JSONObject latest; // card data, or null
 
-    Commute(Context c, Listener l) {
+    Commute(Context c, Place place, Listener l) {
         ctx = c;
+        this.place = place;
         listener = l;
         prefs = c.getSharedPreferences("commute", Context.MODE_PRIVATE);
         importConfig();
@@ -73,9 +76,25 @@ final class Commute {
     private JSONObject config() {
         try {
             JSONObject c = new JSONObject(prefs.getString("config", "{}"));
-            return c.optString("tomtom_key", "").isEmpty() && c.optString("mapbox_token", "").isEmpty() ? null : c;
+            if (c.optString("tomtom_key", "").isEmpty() && c.optString("mapbox_token", "").isEmpty()) return null;
+            JSONObject home = place.get();
+            if (!c.has("area") && !c.has("from") && home != null) {
+                c.put("area", new JSONObject().put("name", home.optString("name", "Home"))
+                        .put("lat", home.getDouble("lat")).put("lon", home.getDouble("lon")));
+            }
+            return c.has("area") || (c.has("from") && c.has("to")) ? c : null;
         } catch (JSONException e) {
             return null;
+        }
+    }
+
+    /** The location changed: redraw the map / recheck traffic for the new one. */
+    synchronized void placeChanged() {
+        latest = null;
+        listener.onChanged();
+        if (poller != null && !poller.isDone()) {
+            stop();
+            start();
         }
     }
 

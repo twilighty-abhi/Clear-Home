@@ -4,8 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION_CODE=85
-VERSION_NAME=0.85
+VERSION_CODE=86
+VERSION_NAME=0.86
 
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 BT="$SDK/build-tools/$(ls "$SDK/build-tools" | sort -V | tail -1)"
