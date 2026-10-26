@@ -4,6 +4,8 @@ A calm, photo-first home screen for a TCL Google TV / Android TV. It replaces th
 stock launcher with your own photos, the time and weather, a few glanceable cards and a
 Dock-style app row.
 
+Clear Home was started by [Ajzal](https://github.com/Mohammedajzal).
+
 ![Dashboard](design/dashboard/1-dashboard.png)
 
 ## What it does
